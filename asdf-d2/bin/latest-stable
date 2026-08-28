@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Prints the version asdf should install for `asdf install d2 latest`
+# (and `asdf install d2 latest:<query>` with $1 set to <query>).
+#
+# Deliberately does NOT just take the newest tag from bin/list-all: d2's
+# upstream tags a version before its release binaries finish building, so
+# "newest tag" can point at a version with nothing to download yet.
+# GitHub's own /releases/latest redirect is authoritative for "latest
+# published release" and costs one unauthenticated HTTP request (no API
+# rate limit), so it's used as the primary source of truth here.
+
+set -euo pipefail
+
+GH_REPO_SLUG="d2lang/d2"
+PLUGIN_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+latest_via_redirect() {
+	# Deliberately NOT using -L: we want curl to stop at the first
+	# redirect and report its target, not follow it to completion
+	# (following it would leave %{redirect_url} empty).
+	local location
+	location="$(curl -fsS -o /dev/null -w '%{redirect_url}' "https://github.com/${GH_REPO_SLUG}/releases/latest")" || return 1
+	[ -n "$location" ] || return 1
+	basename "$location" | sed 's/^v//'
+}
+
+latest_via_query() {
+	local query="$1"
+	"${PLUGIN_BIN_DIR}/list-all" | tr ' ' '\n' | grep -E "^${query}" | tail -1
+}
+
+main() {
+	local query="${1:-}"
+
+	if [ -n "$query" ]; then
+		latest_via_query "$query"
+	else
+		latest_via_redirect || latest_via_query ""
+	fi
+}
+
+main "$@"

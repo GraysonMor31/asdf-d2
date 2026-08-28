@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Lists all versions of d2 that asdf can offer for install.
+# Output: a single line of space-separated versions, oldest first.
+#
+# Implementation note: this lists git tags rather than calling the GitHub
+# REST API, because the API is rate-limited to 60 unauthenticated
+# requests/hour per IP — a real problem in shared CI runners. `git
+# ls-remote` talks the git protocol instead and has no such limit.
+#
+# Trade-off: d2's upstream repo occasionally has tags pushed slightly
+# ahead of their built release binaries, so a tag can transiently exist
+# here with no downloadable archive yet. bin/download surfaces a clear
+# error if that happens; bin/latest-stable avoids the problem separately
+# by asking GitHub directly what its "latest" release is.
+
+set -euo pipefail
+
+GH_REPO="https://github.com/d2lang/d2"
+
+list_all_versions() {
+	git ls-remote --tags --refs "$GH_REPO" |
+		awk '{print $2}' |
+		sed 's#^refs/tags/##; s/^v//' |
+		grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' |
+		sort -t. -k1,1n -k2,2n -k3,3n
+}
+
+list_all_versions | tr '\n' ' '

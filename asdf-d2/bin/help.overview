@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+cat <<'EOF'
+D2 is a modern diagram scripting language that turns text into diagrams.
+
+This plugin installs the official standalone d2 release binaries for
+macOS and Linux (amd64/arm64) from https://github.com/d2lang/d2.
+EOF

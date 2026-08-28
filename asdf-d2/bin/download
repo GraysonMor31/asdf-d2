@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Downloads the d2 release archive for the requested version into
+# $ASDF_DOWNLOAD_PATH. asdf runs this before bin/install.
+#
+# Verified archive layout (checked directly against a real release):
+#   d2-vX.Y.Z-<os>-<arch>.tar.gz
+#     d2-vX.Y.Z/bin/d2        <- the binary
+#     d2-vX.Y.Z/man/d2.1      <- man page
+#     d2-vX.Y.Z/{Makefile,README.md,LICENSE.txt,scripts/...}
+# Extracted here with --strip-components=1 so $ASDF_DOWNLOAD_PATH/bin/d2
+# is what bin/install picks up.
+
+set -euo pipefail
+
+GH_REPO="https://github.com/d2lang/d2"
+
+fail() {
+	echo "asdf-d2: $*" >&2
+	exit 1
+}
+
+get_os() {
+	case "$(uname -s)" in
+	Darwin) echo "macos" ;;
+	Linux) echo "linux" ;;
+	*) fail "unsupported OS '$(uname -s)': d2 only publishes standalone binaries for macOS and Linux (Windows users: install under WSL)" ;;
+	esac
+}
+
+get_arch() {
+	case "$(uname -m)" in
+	x86_64 | amd64) echo "amd64" ;;
+	aarch64 | arm64) echo "arm64" ;;
+	*) fail "unsupported architecture '$(uname -m)'" ;;
+	esac
+}
+
+main() {
+	local version="${ASDF_INSTALL_VERSION:?ASDF_INSTALL_VERSION is not set}"
+	local download_path="${ASDF_DOWNLOAD_PATH:?ASDF_DOWNLOAD_PATH is not set}"
+
+	command -v curl >/dev/null 2>&1 || fail "curl is required"
+	command -v tar >/dev/null 2>&1 || fail "tar is required"
+
+	local os arch tag archive url
+	os="$(get_os)"
+	arch="$(get_arch)"
+	tag="v${version}"
+	archive="d2-${tag}-${os}-${arch}.tar.gz"
+	url="${GH_REPO}/releases/download/${tag}/${archive}"
+
+	echo "d2: downloading ${tag} for ${os}/${arch}"
+	if ! curl -fsSL -o "${download_path}/${archive}" "$url"; then
+		fail "could not download ${url}
+This usually means v${version} doesn't have a published standalone
+release for ${os}/${arch} — this can happen with very recent tags
+whose release build hasn't finished yet. Run 'asdf list all d2' to
+see other available versions."
+	fi
+
+	echo "d2: extracting"
+	# --warning=no-unknown-keyword: the upstream archives are built on
+	# macOS and carry AppleDouble metadata that GNU tar warns about but
+	# handles fine; this just silences the harmless noise.
+	tar -xzf "${download_path}/${archive}" -C "${download_path}" --strip-components=1 --warning=no-unknown-keyword 2>/dev/null ||
+		tar -xzf "${download_path}/${archive}" -C "${download_path}" --strip-components=1
+	rm -f "${download_path}/${archive}"
+
+	[ -f "${download_path}/bin/d2" ] || fail "downloaded archive did not contain bin/d2 — the release layout may have changed upstream"
+}
+
+main

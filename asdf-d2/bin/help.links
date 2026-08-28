@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+cat <<'EOF'
+D2 language:      https://d2lang.com
+Source & releases: https://github.com/d2lang/d2
+EOF

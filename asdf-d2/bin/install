@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Installs a downloaded d2 into $ASDF_INSTALL_PATH. asdf runs this after
+# bin/download has populated $ASDF_DOWNLOAD_PATH.
+#
+# Only the "bin" directory convention is used (no bin/list-bin-paths
+# override needed): asdf shims every executable file it finds directly
+# under $ASDF_INSTALL_PATH/bin, and that's exactly where d2 is placed.
+
+set -euo pipefail
+
+fail() {
+	echo "asdf-d2: $*" >&2
+	exit 1
+}
+
+main() {
+	local install_type="${ASDF_INSTALL_TYPE:?ASDF_INSTALL_TYPE is not set}"
+	local install_path="${ASDF_INSTALL_PATH:?ASDF_INSTALL_PATH is not set}"
+	local download_path="${ASDF_DOWNLOAD_PATH:?ASDF_DOWNLOAD_PATH is not set}"
+
+	[ "$install_type" = "version" ] || fail "only tagged releases are supported (got install type '${install_type}')"
+
+	local bin_src="${download_path}/bin/d2"
+	[ -f "$bin_src" ] || fail "expected binary not found at ${bin_src}"
+
+	mkdir -p "${install_path}/bin"
+	cp "$bin_src" "${install_path}/bin/d2"
+	chmod +x "${install_path}/bin/d2"
+
+	# Man page is a nice-to-have; don't fail the install if it's missing.
+	if [ -f "${download_path}/man/d2.1" ]; then
+		mkdir -p "${install_path}/man/man1"
+		cp "${download_path}/man/d2.1" "${install_path}/man/man1/d2.1"
+	fi
+
+	local installed_version
+	installed_version="$("${install_path}/bin/d2" --version 2>/dev/null || true)"
+	[ -n "$installed_version" ] || fail "installed binary at ${install_path}/bin/d2 did not run correctly"
+
+	echo "d2 ${installed_version} installed successfully"
+}
+
+main
